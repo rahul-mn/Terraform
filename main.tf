@@ -1,11 +1,16 @@
+#Generating a KMS Key
 resource "aws_kms_key" "kms-key" {
   description = "KMS key for ${var.bucket_prefix}-lambda-functions S3 bucket"
 }
+
+#Assigning an Alias
 
 resource "aws_kms_alias" "KMS-key_alias" {
   name          = "alias/S3-kms-key"
   target_key_id = aws_kms_key.kms-key.id
 }
+
+#Creating the Bucket with versioning, logging and encryption enabled
 
 resource "aws_s3_bucket" "lambda_bucket" {
   bucket = "${var.bucket_prefix}-lambda-functions"
@@ -38,12 +43,7 @@ resource "aws_s3_bucket" "lambda_bucket" {
         }
       }
     }
-#  lifecycle {  
-#    prevent_destroy = true
-#  }
-}
-
-resource "aws_iam_role_policy_attachment" "test-attach" {
-  role       = aws_iam_role.LambdatoS3Role.name
-  policy_arn = aws_iam_role.LambdatoS3Role.arn
+  lifecycle {  
+    prevent_destroy = true
+  }
 }

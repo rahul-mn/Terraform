@@ -1,46 +1,105 @@
-resource "aws_iam_role_policy" "test_policy" {
-  name = "LambdatoS3Role_Policy"
-  role = aws_iam_role.LambdatoS3Role.id
-    
-    policy  = jsonencode( {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Sid": "IAM Role for Lambda Execution",
-          "Action": [
-            "s3:GetObject"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:s3:::${aws_s3_bucket.lambda_bucket.id}/*"
-        }
-      ]
-    }
-  )
-}
+#Generating a s3 bucket policy - Secure_Bucket_Policy
 
-resource "aws_s3_bucket_policy" "Bucket_Policy" {
+resource "aws_s3_bucket_policy" "Secure_Bucket_Policy" {
   bucket = aws_s3_bucket.lambda_bucket.id
 
-  policy = <<POLICY
-{
-  "Id": "Policy1636453630855",
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "Stmt1636453411644",
-      "Action": [
+  policy = data.aws_iam_policy_document.secure_bucket_policy_document.json
+}
+
+#Data for Secure_Bucket_Policy
+
+data "aws_iam_policy_document" "secure_bucket_policy_document" {
+  statement {
+    actions   = [
+      "s3:*"
+    ]
+    condition {
+      test      = "Bool"
+      values    = [
+        "false"
+      ]
+      variable  = "aws:SecureTransport"
+    }
+    effect    = "Deny"
+    principals {
+      identifiers = [
+        "*"
+      ]
+      type        = "AWS"
+    }
+    resources = [
+      "arn:aws:s3:::${aws_s3_bucket.lambda_bucket.id}/*"
+    ]
+    sid       = "DenyUnsecuredTransport"
+  }
+  statement {
+    actions   = [
+      "s3:PutObject"
+    ]
+    condition {
+      test      = "StringNotEquals"
+      values    = [
+        "${aws_kms_key.kms-key.arn}"
+      ]
+      variable  = "s3:x-amz-server-side-encryption-aws-kms-key-id"
+    }
+    effect    = "Deny"
+    principals {
+      identifiers = [
+        "*"
+      ]
+      type        = "AWS"
+    }
+    resources = [
+      "arn:aws:s3:::${aws_s3_bucket.lambda_bucket.id}/*"
+    ]
+    sid       = "DenyIncorrectEncryptionHeader"
+  }
+  statement {
+    actions   = [
+      "s3:PutObject"
+    ]
+    condition {
+      test      = "Null"
+      values    = [
+        "true"
+      ]
+      variable  = "s3:x-amz-server-side-encryption"
+    }
+    effect    = "Deny"
+    principals {
+      identifiers = [
+        "*"
+      ]
+      type        = "AWS"
+    }
+    resources = [
+      "arn:aws:s3:::${aws_s3_bucket.lambda_bucket.id}/*"
+    ]
+    sid       = "DenyUnencryptedObjectUploads"
+  }
+}
+
+#Generating a iam policy for cross_account_assume_role - cross_account_iam_policy
+
+resource "aws_iam_policy" "cross_account_iam_policy" {
+  name = "cross_account_iam_policy"
+    
+  policy = data.aws_iam_policy_document.cross_account_iam_policy_document.json
+}
+
+#Data for cross_account_iam_policy
+
+data "aws_iam_policy_document" "cross_account_iam_policy_document" {
+  statement {
+    actions   = [
         "s3:GetObject",
         "s3:ListBucket"
-      ],
-      "Effect": "Allow",
-      "Resource": "arn:aws:s3:::${aws_s3_bucket.lambda_bucket.id}/*",
-      "Principal": {
-        "AWS": [
-          "arn:aws:iam::${var.account_id}:root"
-        ]
-      }
-    }
-  ]
-}
-POLICY
+    ]
+    effect    = "Allow"
+    resources = [
+      "arn:aws:s3:::${aws_s3_bucket.lambda_bucket.id}/*"
+    ]
+    sid       = "AllowListingAndGettingObject"
+  }
 }
